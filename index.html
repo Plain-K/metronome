@@ -2,96 +2,144 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>极简节拍器</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>能出声的节拍器</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        body {
-            background: #1a1a1a;
-            color: white;
-            font-family: Arial, sans-serif;
-            text-align: center;
-            padding: 50px 20px;
-        }
-        .box {
-            max-width: 400px;
-            margin: 0 auto;
-        }
-        h1 {
-            margin-bottom: 20px;
-            font-size: 24px;
-        }
-        .speed {
-            font-size: 48px;
-            margin: 20px 0;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #1a1a1a; color: white; font-family: Arial; text-align: center; padding: 50px 20px; }
+        .container { max-width: 400px; margin: 0 auto; }
+        h1 { margin-bottom: 30px; }
+        .bpm-display { font-size: 50px; margin: 20px 0; color: #4CAF50; }
+        .btn-group { margin: 20px 0; }
         .btn {
             padding: 12px 24px;
-            margin: 8px;
+            margin: 0 8px;
             font-size: 18px;
             border: none;
             border-radius: 8px;
-            background: #007bff;
-            color: white;
             cursor: pointer;
+            background: #2196F3;
+            color: white;
         }
-        .btn.red {
-            background: #dc3545;
-        }
-        .beat {
-            font-size: 60px;
-            margin: 20px 0;
-            color: #ffc107;
-        }
+        .btn.stop { background: #f44336; }
+        .btn.unlock { background: #ff9800; margin-bottom: 20px; }
+        .beat-display { font-size: 70px; margin: 30px 0; color: #ffeb3b; }
     </style>
 </head>
 <body>
-    <div class="box">
-        <h1>网页节拍器</h1>
-        <div class="speed" id="speed">60</div> BPM
-
-        <div>
-            <button class="btn" onclick="changeSpeed(-5)">-5</button>
-            <button class="btn" onclick="changeSpeed(+5)">+5</button>
+    <div class="container">
+        <h1>网页节拍器（必点解锁声音）</h1>
+        
+        <!-- 手动解锁音频按钮（关键！） -->
+        <button class="btn unlock" onclick="unlockAudio()">🔊 点击解锁声音</button>
+        
+        <div class="bpm-display" id="bpm">60</div>
+        <div class="btn-group">
+            <button class="btn" onclick="changeBpm(-5)">-5</button>
+            <button class="btn" onclick="changeBpm(5)">+5</button>
         </div>
-
-        <div class="beat" id="beat">●</div>
-
-        <button class="btn" id="start" onclick="start()">开始</button>
-        <button class="btn red" onclick="stop()">停止</button>
+        
+        <div class="beat-display" id="beat">●</div>
+        
+        <button class="btn" onclick="startMetronome()">开始</button>
+        <button class="btn stop" onclick="stopMetronome()">停止</button>
     </div>
 
     <script>
         let bpm = 60;
         let timer = null;
-        let count = 0;
+        let beatCount = 0;
+        let audioContext = null; // 音频上下文（解决静音限制）
+        let oscillator = null;   // 音频振荡器
 
-        function playBeat() {
-            let audio = new Audio('https://assets.mixkit.co/sfx/preview/mixkit-software-interface-start-2574.mp3');
-            audio.volume = 0.7;
-            audio.play();
-            document.getElementById('beat').innerText = count % 4 + 1 || 4;
-            count++;
+        // 1. 解锁音频（必须用户点击后才能初始化）
+        function unlockAudio() {
+            // 创建音频上下文
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            // 播放一个静音解锁
+            const tempOsc = audioContext.createOscillator();
+            const tempGain = audioContext.createGain();
+            tempGain.gain.value = 0; // 静音
+            tempOsc.connect(tempGain);
+            tempGain.connect(audioContext.destination);
+            tempOsc.start();
+            tempOsc.stop(0.01);
+            
+            alert("声音已解锁！现在可以点击开始使用节拍器");
         }
 
-        function start() {
+        // 2. 播放节拍声
+        function playBeatSound() {
+            if (!audioContext) {
+                alert("请先点击「🔊 点击解锁声音」按钮！");
+                return;
+            }
+            
+            // 创建节拍声（440Hz 高音，第一拍用880Hz强调）
+            oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            oscillator.type = 'square'; // 方波，节拍声更清晰
+            oscillator.frequency.value = (beatCount % 4 === 0) ? 880 : 440; // 第一拍高音
+            gainNode.gain.value = 0.3; // 音量
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            oscillator.start();
+            oscillator.stop(audioContext.currentTime + 0.1); // 声音持续0.1秒
+        }
+
+        // 3. 调整BPM
+        function changeBpm(step) {
+            bpm = Math.max(20, Math.min(240, bpm + step));
+            document.getElementById('bpm').textContent = bpm;
+            
+            // 如果正在播放，更新节拍速度
+            if (timer) {
+                stopMetronome();
+                startMetronome();
+            }
+        }
+
+        // 4. 开始节拍器
+        function startMetronome() {
+            if (!audioContext) {
+                alert("请先点击「🔊 点击解锁声音」按钮！");
+                return;
+            }
+            
+            // 停止已有定时器
             if (timer) clearInterval(timer);
-            let ms = 60000 / bpm;
-            timer = setInterval(playBeat, ms);
+            
+            // 计算每拍间隔（毫秒）
+            const interval = 60000 / bpm;
+            
+            // 立即播放第一拍
+            playBeatSound();
+            beatCount++;
+            document.getElementById('beat').textContent = beatCount % 4 || 4;
+            
+            // 启动定时器
+            timer = setInterval(() => {
+                playBeatSound();
+                beatCount++;
+                document.getElementById('beat').textContent = beatCount % 4 || 4;
+            }, interval);
         }
 
-        function stop() {
+        // 5. 停止节拍器
+        function stopMetronome() {
             clearInterval(timer);
             timer = null;
-            document.getElementById('beat').innerText = '●';
-        }
-
-        function changeSpeed(num) {
-            bpm = Math.max(20, Math.min(240, bpm + num));
-            document.getElementById('speed').innerText = bpm;
+            beatCount = 0;
+            document.getElementById('beat').textContent = "●";
+            
+            // 停止当前声音
+            if (oscillator) {
+                oscillator.stop();
+                oscillator = null;
+            }
         }
     </script>
 </body>
