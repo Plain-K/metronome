@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>极简节拍器</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background: #1a1a1a;
+            color: white;
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding: 50px 20px;
+        }
+        .box {
+            max-width: 400px;
+            margin: 0 auto;
+        }
+        h1 {
+            margin-bottom: 20px;
+            font-size: 24px;
+        }
+        .speed {
+            font-size: 48px;
+            margin: 20px 0;
+        }
+        .btn {
+            padding: 12px 24px;
+            margin: 8px;
+            font-size: 18px;
+            border: none;
+            border-radius: 8px;
+            background: #007bff;
+            color: white;
+            cursor: pointer;
+        }
+        .btn.red {
+            background: #dc3545;
+        }
+        .beat {
+            font-size: 60px;
+            margin: 20px 0;
+            color: #ffc107;
+        }
+    </style>
+</head>
+<body>
+    <div class="box">
+        <h1>网页节拍器</h1>
+        <div class="speed" id="speed">60</div> BPM
+
+        <div>
+            <button class="btn" onclick="changeSpeed(-5)">-5</button>
+            <button class="btn" onclick="changeSpeed(+5)">+5</button>
+        </div>
+
+        <div class="beat" id="beat">●</div>
+
+        <button class="btn" id="start" onclick="start()">开始</button>
+        <button class="btn red" onclick="stop()">停止</button>
+    </div>
+
+    <script>
+        let bpm = 60;
+        let timer = null;
+        let count = 0;
+
+        function playBeat() {
+            let audio = new Audio('https://assets.mixkit.co/sfx/preview/mixkit-software-interface-start-2574.mp3');
+            audio.volume = 0.7;
+            audio.play();
+            document.getElementById('beat').innerText = count % 4 + 1 || 4;
+            count++;
+        }
+
+        function start() {
+            if (timer) clearInterval(timer);
+            let ms = 60000 / bpm;
+            timer = setInterval(playBeat, ms);
+        }
+
+        function stop() {
+            clearInterval(timer);
+            timer = null;
+            document.getElementById('beat').innerText = '●';
+        }
+
+        function changeSpeed(num) {
+            bpm = Math.max(20, Math.min(240, bpm + num));
+            document.getElementById('speed').innerText = bpm;
+        }
+    </script>
+</body>
+</html>
